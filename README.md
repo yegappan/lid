@@ -1,5 +1,3 @@
-lid
-===
 
 The lid plugin integrates the GNU id-utils lid tool with Vim to lookup 
 keywords in the ID database. 
