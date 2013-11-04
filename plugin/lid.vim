@@ -1,47 +1,55 @@
 " File: lid.vim
 " Author: Yegappan Lakshmanan (yegappan AT yahoo DOT com)
-" Version: 2.4
-" Last Modified: May 29 2003
+" Version: 2.5
+" Last Modified: March 21, 2013
 " 
 " Overview
 " --------
-" The lid.vim Vim plugin provides a way to interact with the lid tool to
-" lookup keywords in the ID database.
+" The lid plugin integrates the GNU id-utils lid tool with Vim to lookup
+" keywords in the ID database.
 " 
 " For more information about id utilities (lid, aid, etc), visit the 
 " following pages: 
 "
-"     http://www.delorie.com/gnu/docs/id-utils/id-utils_toc.html 
 "     http://www.gnu.org/software/idutils/idutils.html 
-
-" You can download the id-utils binaries for Windows (DJGPP version)
-" from: 
+"     http://www.delorie.com/gnu/docs/id-utils/id-utils_toc.html 
+"
+" You can download the id-utils binaries for MS-Windows from: 
 " 
-"     ftp://ftp.simtel.net/pub/simtelnet/gnu/djgpp/v2gnu/idu32b.zip
+"     http://gnuwin32.sourceforge.net/packages/id-utils.htm
 "
 " Installation
 " ------------
-" 1. Copy the lid.vim file to the $HOME/.vim/plugin directory.  Refer to
-"    ':help add-plugin', ':help add-global-plugin' and ':help runtimepath' for
-"    more details about Vim plugins.
-" 2. Set the LID_Cmd variable to point to the lid utility path.
+" 1. Copy the lid.vim file to the $HOME/.vim/plugin or $HOME/vimfiles/plugin
+"    or $VIM/vimfiles/plugin directory.
+"    Refer to the following Vim help topics for more information about Vim
+"    plugins:
+"       :help add-plugin
+"       :help add-global-plugin
+"       :help runtimepath
+" 2. If the GNU lid utility is not already present in one of the directories
+"    in the PATH environment variable, then set the LID_Cmd variable in the
+"    .vimrc file to point to the GNU lid utility path.
 " 3. Restart Vim.
-" 4. You can use the ":Lid" command to search for a keyword.
-"
-" This plugin will not work in 'compatible' mode.  Make sure the 'compatible'
-" option is not set.
+" 4. You can now use the ":Lid" command to search for a keyword.
 "
 " Usage
 " -----
+" The lid plugin introduces two Vim commands to lookup keywords in the ID
+" database.
+"
+"       :Lid [ <keyword> ]
+"       :Aid [ <keyword> ]
+"
 " You can lookup keywords in the ID database using the 'Lid' command. For
 " example,
 " 
 "       :Lid<Enter> 
 " 
-" This will prompt you for the keyword to lookup.  The default is the current
-" keyword under the cursor.  You can retrieve previously entered keywords
-" using the up and down arrow keys. You can cancel the lookup by pressing the
-" escape key.
+" This command will prompt you for the keyword to lookup.  The default is the
+" current keyword under the cursor.  You can retrieve previously entered
+" keywords using the up and down arrow keys. You can cancel the lookup by
+" pressing the escape key.
 "
 " You can map a key to invoke the Lid command:
 "
@@ -56,19 +64,32 @@
 " In the above command format, you can press the <Tab> key to expand
 " keywords from a tags file.
 "
-" You can use the "-p" and "-v" option to the 'Lid' command to selectively
-" display lines from the lid output. You can use the "-p" option to the 'Lid'
-" command to list only those lid matches that contain a pattern. You can use
-" the "-v" option to the 'Lid' command to list only those lid matches that
-" does not contain a pattern. Only one of the "-p" or "-v" options can be used
-" at a time.
+" You can use the "-g" and "-x" option to the 'Lid' command to selectively
+" display lines from the lid output. You can use the "-g" option to the 'Lid'
+" command to list only those lid matches that contain a Vim pattern. You can
+" use the "-x" option to the 'Lid' command to list only those lid matches that
+" does not contain a Vim pattern.
 "
-"        :Lid -p
-"        :Lid -v
+"        :Lid -g
+"        :Lid -x
 "
 " If you use the any one of the above options, you will prompted to enter the
 " pattern you are interested in.
+"
+" You can specify additional command-line options accepted by the lid utility
+" to the above commands.  For example, to perform a case-insensitive search,
+" you can use the following command:
+"
+"       :Lid -i
 " 
+" You can use the ":Aid" command to list all the matching keywords in the
+" ID database that has the specified literal pattern:
+"
+"       :Aid <keyword>
+"
+" All the above description about the :Lid command also applies to the
+" :Aid command.
+"
 " The output of the lid command will be listed in the Vim quickfix window.
 " 1. You can select a line in the quickfix window and press <Enter> or double
 "    click on a match to jump to that line.
@@ -151,16 +172,33 @@
 "
 "       let LID_Jump_To_Match = 0
 "
+" By default, the lid search results are added to the global quickfix list.
+" If you like to use the per-window location list for the results, then you
+" can set the LID_Use_Location_List variable to 1:
+"
+"       let LID_Use_Location_List = 1
+"
+" The location list feature is supported only in Vim version 7.0 and later
+" versions. If the location list is used, then you have to use the location
+" list commands to browse the results.
 "
 " --------------------- Do not modify after this line ---------------------
-if exists('loaded_lid') || &cp
+if exists('loaded_lid')
     finish
 endif
 let loaded_lid = 1
 
+" Line continuation used here
+let s:cpo_save = &cpo
+set cpo&vim
+
 " The default location of the lid tool.
 if !exists('LID_Cmd')
     let LID_Cmd = 'lid'
+endif
+
+if !exists('AID_Cmd')
+    let AID_Cmd = 'aid'
 endif
 
 " Name of the ID file to supply to lid
@@ -204,21 +242,40 @@ if !exists('LID_Jump_To_Match')
     let LID_Jump_To_Match = 1
 endif
 
+" Configuration to choose between the global quickfix list and the window
+" local location list for the lid results. When LID_Use_Location_List is set
+" to zero, quickfix list is used. When LID_Use_Location_List is set to 1,
+" window-local location list is used.
+if !exists('LID_Use_Location_List')
+    let LID_Use_Location_List = 0
+endif
+if v:version < 700
+    " Before Vim 7.0, location list is not supported in Vim
+    let LID_Use_Location_List = 0
+endif
+
 " Extract lines matching the supplied pattern from the supplied text
 function! s:ExtractMatchingLines(txt, pattern)
     let filter_output = ''
-    let t = a:txt
 
-    let len = strlen(t)
+    if v:version < 700
+        let t = a:txt
+        let len = strlen(t)
 
-    while t != ''
-        let one_line = strpart(t, 0, stridx(t, "\n"))
-        let t = strpart(t, stridx(t, "\n") + 1, len)
+        while t != ''
+            let one_line = strpart(t, 0, stridx(t, "\n"))
+            let t = strpart(t, stridx(t, "\n") + 1, len)
 
-        if one_line =~# a:pattern
-            let filter_output = filter_output . one_line . "\n"
-        endif
-    endwhile
+            if one_line =~# a:pattern
+                let filter_output = filter_output . one_line . "\n"
+            endif
+        endwhile
+    else
+        let input_list = split(a:txt, "\n")
+        let cond = "v:val =~# a:pattern"
+        let matching_lines = filter(input_list, cond)
+        let filter_output = join(matching_lines, "\n")
+    endif
 
     return filter_output
 endfunction
@@ -226,25 +283,32 @@ endfunction
 " Remove lines matching the supplied pattern from the supplied text
 function! s:RemoveMatchingLines(txt, pattern)
     let filter_output = ''
-    let t = a:txt
 
-    let len = strlen(t)
+    if v:version < 700
+        let t = a:txt
+        let len = strlen(t)
 
-    while t != ''
-        let one_line = strpart(t, 0, stridx(t, "\n"))
-        let t = strpart(t, stridx(t, "\n") + 1, len)
+        while t != ''
+            let one_line = strpart(t, 0, stridx(t, "\n"))
+            let t = strpart(t, stridx(t, "\n") + 1, len)
 
-        if one_line !~# a:pattern
-            let filter_output = filter_output . one_line . "\n"
-        endif
-    endwhile
+            if one_line !~# a:pattern
+                let filter_output = filter_output . one_line . "\n"
+            endif
+        endwhile
+    else
+        let input_list = split(a:txt, "\n")
+        let cond = "v:val !~# a:pattern"
+        let remaining_lines = filter(input_list, cond)
+        let filter_output = join(remaining_lines, "\n")
+    endif
 
     return filter_output
 endfunction
 
 " Run lid using the supplied arguments
-function! s:RunLid(...)
-    let usage = 'Usage: Lid [[-p] [-v] [-?] [-h] [identifier]]'
+function! s:RunLid(cmd_name, ...)
+    let usage = 'Usage: Lid [[-g] [-x] [-?] [-h]] [identifier]'
 
     " If the user wanted to select the ID file everytime, Lid is run,
     " then ask for the location of the file.  Use the last ID file as
@@ -264,32 +328,62 @@ function! s:RunLid(...)
 
     let skip_pat = ''
     let match_pat = ''
+    let id = ''
+    let inc_opt = 0
+    let exc_opt = 0
+    let lid_opt = ''
 
-    if a:0 == 0 || a:1 == '-p' || a:1 == '-v'
+    let argcnt = 1
+    while argcnt <= a:0
+        let one_arg = a:{argcnt}
+
+        if one_arg !~ '^-'
+            " Non-option argument. It should be the identifier
+            " Ignore the rest of the arguments
+            let id = one_arg
+            break
+        elseif one_arg == '-g'
+            " Include only lines matching specified pattern
+            let inc_opt = 1
+        elseif one_arg == '-x'
+            " Exclude lines matching specified pattern
+            let exc_opt = 1
+        else
+            " Lid option
+            let lid_opt = lid_opt . one_arg . ' '
+        endif
+
+        let argcnt = argcnt + 1
+    endwhile
+
+    if id == ''
         " Get the identifier from the user, if it is not already supplied
         let id = input('Lookup identifier: ', expand('<cword>'))
         if id == ''
             return
         endif
+        echo "\r"
     endif
 
-    " Process options
-    if a:0 != 0
-        if a:1 == '-p'
-            let match_pat = input('Include only lines containing: ', '')
-        elseif a:1 == '-v'
-            let skip_pat = input('Exclude lines containing: ', '')
-        elseif a:1 == '-?' || a:1 == '-h'
-            echomsg usage
-            return 1
-        else
-            let id = a:1
-        endif
+    if inc_opt
+        let match_pat = input('Include only lines containing: ', '')
+        echo "\r"
     endif
 
-    echo "\n"
+    if exc_opt
+        let skip_pat = input('Exclude lines containing: ', '')
+        echo "\r"
+    endif
 
     let cmd_output = ''
+    let id_file_found = 0
+
+    if a:cmd_name == 'aid'
+        let base_cmd = g:AID_Cmd
+    else
+        let base_cmd = g:LID_Cmd
+    endif
+    let base_cmd = base_cmd . ' ' . lid_opt . ' -R grep'
 
     while id_file != ''
         if !g:LID_Search_Multiple_ID_Files && cmd_output != ''
@@ -309,7 +403,9 @@ function! s:RunLid(...)
             continue
         endif
 
-        let cmd = g:LID_Cmd . ' -R grep -f ' . one_file . ' '
+        let id_file_found = 1
+
+        let cmd = base_cmd . ' -f ' . one_file . ' '
         let cmd = cmd . g:LID_Shell_Quote_Char . id . g:LID_Shell_Quote_Char
 
         let output = system(cmd)
@@ -321,6 +417,23 @@ function! s:RunLid(...)
 
         let cmd_output = cmd_output . output
     endwhile
+
+    if !id_file_found
+        " None of the ID files specified in the id_file are found
+        " So, invoke lid without specifying the ID file location
+        "
+        let cmd = base_cmd . ' ' . g:LID_Shell_Quote_Char . id . 
+                    \ g:LID_Shell_Quote_Char
+
+        let output = system(cmd)
+
+        if v:shell_error && output != ''
+            echohl WarningMsg | echomsg output | echohl None
+            return
+        endif
+
+        let cmd_output = cmd_output . output
+    endif
 
     if cmd_output == ''
         echohl WarningMsg | echomsg 'Error: Identifier ' . id . ' not found' | 
@@ -358,37 +471,58 @@ function! s:RunLid(...)
     " Send the output to a temporary file to use with the :cfile command
     let tmpfile = tempname()
 
+    let old_verbose = &verbose
+    set verbose&vim
+
     exe 'redir! > ' . tmpfile
+    silent echon '[' . a:cmd_name . ' results for pattern: ' . id . "]\n"
     silent echon cmd_output
     redir END
+
+    let &verbose = old_verbose
 
     " Set the 'errorformat' to parse the lid output.
     let old_efm = &efm
     set efm=%f:%l:%m
 
-    execute 'silent! cfile ' . tmpfile
+    if g:LID_Use_Location_List == 1
+        execute 'silent! lgetfile ' . tmpfile
+    else
+        if exists(":cgetfile")
+            execute 'silent! cgetfile ' . tmpfile
+        else
+            execute 'silent! cfile ' . tmpfile
+            if !g:LID_Jump_To_Match
+                execute "normal \<C-O>"
+            endif
+        endif
+    endif
 
     let &efm = old_efm
 
-    if !g:LID_Jump_To_Match
-        execute "normal \<C-O>"
-    endif
-
     " Open the lid output window
     if g:LID_OpenQuickfixWindow == 1
-        " Open the quickfix window below the current window
-        botright copen
-    endif
-
-    " Jump to the first match.  Otherwise, the cursor will be in the quickfix
-    " window
-    if g:LID_Jump_To_Match
-        cc
+        if g:LID_Use_Location_List == 1
+            " Open the location list window below the current window
+            botright lopen
+        else
+            " Open the quickfix window below the current window
+            botright copen
+        endif
+        "if v:version >= 703
+        "    " Set the quickfix window title to display the lid command.
+        "    let w:quickfix_title = ':Lid ' . id
+        "endif
     endif
 
     call delete(tmpfile)
 endfunction
 
 " Define the Lid command to run lid
-command! -nargs=? -complete=tag Lid call s:RunLid(<f-args>)
+command! -nargs=* -complete=tag Lid call s:RunLid("lid", <f-args>)
+command! -nargs=* -complete=tag Aid call s:RunLid("aid", <f-args>)
+
+" restore 'cpo'
+let &cpo = s:cpo_save
+unlet s:cpo_save
 
