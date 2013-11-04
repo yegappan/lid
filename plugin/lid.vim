@@ -1,7 +1,7 @@
 " File: lid.vim
-" Author: Yegappan Lakshmanan
-" Version: 2.3
-" Last Modified: Sep 18 2002
+" Author: Yegappan Lakshmanan (yegappan AT yahoo DOT com)
+" Version: 2.4
+" Last Modified: May 29 2003
 " 
 " Overview
 " --------
@@ -14,10 +14,11 @@
 "     http://www.delorie.com/gnu/docs/id-utils/id-utils_toc.html 
 "     http://www.gnu.org/software/idutils/idutils.html 
 
-" You can download the id-utils binaries for Windows from: 
-"
-"     http://www.mossbayeng.com/~ron/vim/idutils.tar.gz
+" You can download the id-utils binaries for Windows (DJGPP version)
+" from: 
 " 
+"     ftp://ftp.simtel.net/pub/simtelnet/gnu/djgpp/v2gnu/idu32b.zip
+"
 " Installation
 " ------------
 " 1. Copy the lid.vim file to the $HOME/.vim/plugin directory.  Refer to
@@ -44,7 +45,7 @@
 "
 " You can map a key to invoke the Lid command:
 "
-"       nnoremap <silent> <F4> :Lid<CR>
+"       nnoremap <silent> <F4> :Lid <C-R><C-W><CR>
 "
 " Add the above mapping to your ~/.vimrc file.
 " 
@@ -113,11 +114,10 @@
 " If more than one ID file is specified using the 'LID_File' variable, you can
 " set the 'LID_Search_Multiple_ID_Files' variable to 1 to always search for a
 " keyword in all the specified ID files. By default,
-" 'LID_Search_Multiple_ID_Files' variable is set to zero. When a match is
-" found in one of the specified ID files, subsequent ID files are not searched
-" for the keyword.
+" 'LID_Search_Multiple_ID_Files' variable is set to one. All the specified ID
+" files are searched for the keyword. 
 "
-"       let LID_Search_Multiple_ID_Files = 1
+"       let LID_Search_Multiple_ID_Files = 0
 " 
 " By default, when you invoke the :Lid command the quickfix window will be
 " opened with the lid output.  You can disable opening the quickfix window,
@@ -170,7 +170,7 @@ endif
 
 " Combine matches from more than one ID file?
 if !exists('LID_Search_Multiple_ID_Files')
-    let LID_Search_Multiple_ID_Files = 0
+    let LID_Search_Multiple_ID_Files = 1
 endif
 
 " Open the LID output window.  Set this variable to zero, to not open
@@ -303,6 +303,10 @@ function! s:RunLid(...)
         else
             let one_file = strpart(id_file, 0, idx)
             let id_file = strpart(id_file, idx + 1)
+        endif
+
+        if !filereadable(one_file)
+            continue
         endif
 
         let cmd = g:LID_Cmd . ' -R grep -f ' . one_file . ' '
