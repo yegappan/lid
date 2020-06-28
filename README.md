@@ -5,8 +5,8 @@ keywords in the ID database.
 For more information about id utilities (lid, aid, etc), visit the 
 following pages: 
 
-    http://www.gnu.org/software/idutils/idutils.html 
-    http://www.delorie.com/gnu/docs/id-utils/id-utils_toc.html 
+    http://www.gnu.org/software/idutils/idutils.html
+    https://www.gnu.org/software/idutils/manual/idutils.html
 
 You can download the id-utils binaries for MS-Windows from: 
 
